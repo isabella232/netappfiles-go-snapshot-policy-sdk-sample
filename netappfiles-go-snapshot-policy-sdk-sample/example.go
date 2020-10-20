@@ -74,7 +74,7 @@ func main() {
 	// Cleanup and exit handling
 	defer func() { exit(cntx); os.Exit(exitCode) }()
 
-	utils.PrintHeader("Azure NetAppFiles Go Snapshot Policy SDK Sample - Sample application that enables Snaphost Policy on a NFSv3 volume.")
+	utils.PrintHeader("Azure NetAppFiles Go Snapshot Policy SDK Sample - Sample application that enables Snaphost Policy on an NFSv3 volume.")
 
 	// Getting subscription ID from authentication file
 	config, err := utils.ReadAzureBasicInfoJSON(os.Getenv("AZURE_AUTH_LOCATION"))
