@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/Azure-Samples/netappfiles-go-snapshot-policy-sdk-sample/netappfiles-go-snapshot-policy-sdk-sample/internal/sdkutils"
@@ -49,10 +48,10 @@ var (
 	}
 
 	// ANF Resource Properties
-	location              = "westus"
-	resourceGroupName     = "anf-rg"
-	vnetresourceGroupName = "anf-rg"
-	vnetName              = "westus-vnet"
+	location              = "eastus"
+	resourceGroupName     = "anf01-rg"
+	vnetresourceGroupName = "anf01-rg"
+	vnetName              = "vnet-01"
 	subnetName            = "anf-sn"
 	anfAccountName        = haikunator.New(time.Now().UTC().UnixNano()).Haikunate()
 	snapshotPolicyName    = "snapshotpolicy01"
@@ -108,10 +107,12 @@ func main() {
 		return
 	}
 
+	//------------------
 	// Account creation
+	//------------------
 	utils.ConsoleOutput(fmt.Sprintf("Creating Azure NetApp Files account %v...", anfAccountName))
 
-	account, err := sdkutils.CreateAnfAccount(cntx, location, resourceGroupName, anfAccountName, nil, sampleTags)
+	account, err := sdkutils.CreateANFAccount(cntx, location, resourceGroupName, anfAccountName, nil, sampleTags)
 	if err != nil {
 		utils.ConsoleOutput(fmt.Sprintf("an error ocurred while creating account: %v", err))
 		exitCode = 1
@@ -121,9 +122,11 @@ func main() {
 	accountID = *account.ID
 	utils.ConsoleOutput(fmt.Sprintf("Account successfully created, resource id: %v", accountID))
 
+	//-----------------------
 	// Capacity pool creation
+	//-----------------------
 	utils.ConsoleOutput(fmt.Sprintf("Creating Capacity Pool %v...", capacityPoolName))
-	capacityPool, err := sdkutils.CreateAnfCapacityPool(
+	capacityPool, err := sdkutils.CreateANFCapacityPool(
 		cntx,
 		location,
 		resourceGroupName,
@@ -141,6 +144,10 @@ func main() {
 	}
 	capacityPoolID = *capacityPool.ID
 	utils.ConsoleOutput(fmt.Sprintf("Capacity Pool successfully created, resource id: %v", capacityPoolID))
+
+	//-------------------------
+	// Snapshot policy creation
+	//-------------------------
 
 	// Creating Snapshot Policy - using arbitrary values
 	utils.ConsoleOutput(fmt.Sprintf("Creating Snapshot Policy %v...", snapshotPolicyName))
@@ -189,7 +196,7 @@ func main() {
 	}
 
 	// Create the snapshot policy resource
-	snapshotPolicy, err := sdkutils.CreateAnfSnapshotPolicy(
+	snapshotPolicy, err := sdkutils.CreateANFSnapshotPolicy(
 		cntx,
 		resourceGroupName,
 		anfAccountName,
@@ -207,7 +214,9 @@ func main() {
 	snapshotPolicyID = *snapshotPolicy.ID
 	utils.ConsoleOutput(fmt.Sprintf("Snapshot Policy successfully created, resource id: %v", snapshotPolicyID))
 
+	//----------------
 	// Volume creation
+	//----------------
 	utils.ConsoleOutput(fmt.Sprintf("Creating NFSv3 Volume %v with Snapshot Policy %v attached...", volumeName, snapshotPolicyName))
 
 	// Build data protection object with snapshot properties
@@ -217,7 +226,7 @@ func main() {
 		},
 	}
 
-	volume, err := sdkutils.CreateAnfVolume(
+	volume, err := sdkutils.CreateANFVolume(
 		cntx,
 		location,
 		resourceGroupName,
@@ -254,43 +263,62 @@ func main() {
 		return
 	}
 
-	// Updating a Snapshot Policy
-	// TODO: utils.ConsoleOutput(fmt.Sprintf("Updating snapshot policy %v...", snapshotPolicyName))
+	//------------------------
+	// Snapshot Policy updates
+	//------------------------
+	utils.ConsoleOutput(fmt.Sprintf("Updating snapshot policy %v...", snapshotPolicyName))
 
+	// Updating number of snapshots to keep for hourly schedule
+	newHourlySchedule := snapshotPolicy.HourlySchedule.(netapp.HourlySchedule)
+	newHourlySchedule.SnapshotsToKeep = to.Int32Ptr(10)
+
+	// Creating a patch object
+	snapshotPolicyPatch := netapp.SnapshotPolicyPatch{
+		Location: to.StringPtr(location),
+		SnapshotPolicyProperties: &netapp.SnapshotPolicyProperties{
+			HourlySchedule: &newHourlySchedule,
+		},
+	}
+
+	// Executing the update
+	_, err = sdkutils.UpdateANFSnapshotPolicy(
+		cntx,
+		resourceGroupName,
+		anfAccountName,
+		snapshotPolicyName,
+		snapshotPolicyPatch,
+	)
+
+	if err != nil {
+		utils.ConsoleOutput(fmt.Sprintf("an error ocurred while updating snapshot policy: %v", err))
+		exitCode = 1
+		shouldCleanUp = false
+		return
+	}
+
+	utils.ConsoleOutput("Wait a few seconds for snapshot policy to complete update operation before deleting resources...")
+	time.Sleep(time.Duration(5) * time.Second)
 }
 
 func exit(cntx context.Context) {
 	utils.ConsoleOutput("Exiting")
 
+	// In order to enable clean up, change the shouldCleanUp variable in the var() section
+	// to true. Notice that if there is an error while executing the main parts of this
+	// code, clean up will need to be done manually.
+	// Since resource deletions cannot happen if there is a child resource, we will perform the
+	// clean up in the following order: Volume -> Capacity Pool -> Snapshot Policy -> Account
 	if shouldCleanUp {
 		utils.ConsoleOutput("\tPerforming clean up")
 
-		// Clean up must be executed in reverse order
 		resourceGroupName := resourceGroupName
 		accountName := anfAccountName
 		poolName := capacityPoolName
 		volumeName := volumeName
 
-		// Delete replication
-		utils.ConsoleOutput(fmt.Sprintf("\tRemoving data protection object from %v volume...", volumeName))
-		err := sdkutils.DeleteAnfVolumeReplication(
-			cntx,
-			resourceGroupName,
-			accountName,
-			poolName,
-			volumeName,
-		)
-		if err != nil && !strings.Contains(err.Error(), "VolumeReplicationMissing") {
-			utils.ConsoleOutput(fmt.Sprintf("an error ocurred while deleting data replication: %v", err))
-			exitCode = 1
-			return
-		}
-		sdkutils.WaitForNoANFResource(cntx, volumeID, 60, 50, true)
-		utils.ConsoleOutput("\tData replication successfully deleted")
-
 		// Volume deletion
 		utils.ConsoleOutput(fmt.Sprintf("\tRemoving %v volume...", volumeID))
-		err = sdkutils.DeleteAnfVolume(
+		err := sdkutils.DeleteANFVolume(
 			cntx,
 			resourceGroupName,
 			accountName,
@@ -302,12 +330,18 @@ func exit(cntx context.Context) {
 			exitCode = 1
 			return
 		}
-		sdkutils.WaitForNoANFResource(cntx, volumeID, 60, 50, false)
+		err = sdkutils.WaitForNoANFResource(cntx, volumeID, 60, 50, false)
+		if err != nil {
+			utils.ConsoleOutput(fmt.Sprintf("an error ocurred while waiting for volume complete deletion: %v", err))
+			exitCode = 1
+			shouldCleanUp = false
+			return
+		}
 		utils.ConsoleOutput("\tVolume successfully deleted")
 
 		// Pool Cleanup
 		utils.ConsoleOutput(fmt.Sprintf("\tCleaning up capacity pool %v...", capacityPoolID))
-		err = sdkutils.DeleteAnfCapacityPool(
+		err = sdkutils.DeleteANFCapacityPool(
 			cntx,
 			resourceGroupName,
 			accountName,
@@ -318,12 +352,40 @@ func exit(cntx context.Context) {
 			exitCode = 1
 			return
 		}
-		sdkutils.WaitForNoANFResource(cntx, capacityPoolID, 60, 50, false)
+		err = sdkutils.WaitForNoANFResource(cntx, capacityPoolID, 60, 50, false)
+		if err != nil {
+			utils.ConsoleOutput(fmt.Sprintf("an error ocurred while waiting for capacity complete deletion: %v", err))
+			exitCode = 1
+			shouldCleanUp = false
+			return
+		}
 		utils.ConsoleOutput("\tCapacity pool successfully deleted")
+
+		// Snapshot Policy Cleanup
+		utils.ConsoleOutput(fmt.Sprintf("\tCleaning up snapshot policy %v...", snapshotPolicyID))
+		err = sdkutils.DeleteANFSnapshotPolicy(
+			cntx,
+			resourceGroupName,
+			accountName,
+			snapshotPolicyName,
+		)
+		if err != nil {
+			utils.ConsoleOutput(fmt.Sprintf("an error ocurred while deleting snapshot policy: %v", err))
+			exitCode = 1
+			return
+		}
+		err = sdkutils.WaitForNoANFResource(cntx, snapshotPolicyID, 60, 50, false)
+		if err != nil {
+			utils.ConsoleOutput(fmt.Sprintf("an error ocurred while waiting for snapshot policy complete deletion: %v", err))
+			exitCode = 1
+			shouldCleanUp = false
+			return
+		}
+		utils.ConsoleOutput("\tSnapshot policy successfully deleted")
 
 		// Account Cleanup
 		utils.ConsoleOutput(fmt.Sprintf("\tCleaning up account %v...", accountID))
-		err = sdkutils.DeleteAnfAccount(
+		err = sdkutils.DeleteANFAccount(
 			cntx,
 			resourceGroupName,
 			accountName,
@@ -334,6 +396,6 @@ func exit(cntx context.Context) {
 			return
 		}
 		utils.ConsoleOutput("\tAccount successfully deleted")
+		utils.ConsoleOutput("\tCleanup completed!")
 	}
-	utils.ConsoleOutput("\tCleanup completed!")
 }
