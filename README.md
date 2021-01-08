@@ -11,7 +11,7 @@ description: "This project demonstrates how to create a Snapshot Policy for Micr
 
 # Azure NetApp Files Snapshot Policy SDK Sample for Go
 
-This project demonstrates how to create a snapshot policy for Microsoft.NetApp resource provider using Go SDK. This process can be used with other supported protocol types as well.
+This project demonstrates how to create a snapshot policy for Microsoft.NetApp resource provider using Go SDK. This process can be used with other supported protocol types as well. 
 
 In this sample application we perform the following operations:
 
@@ -19,7 +19,7 @@ In this sample application we perform the following operations:
   * NetApp account
     * Snapshot policy
     * Capacity pool
-      * NFS v3 volume with a snapshot policy assigned
+    * NFS v3 volume with a snapshot policy assigned
 * Updates
   * Snapshot policy
 * Clean up created resources (not enabled by default)
