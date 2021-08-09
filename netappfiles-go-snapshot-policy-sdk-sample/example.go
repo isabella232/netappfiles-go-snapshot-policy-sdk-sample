@@ -269,7 +269,7 @@ func main() {
 	utils.ConsoleOutput(fmt.Sprintf("Updating snapshot policy %v...", snapshotPolicyName))
 
 	// Updating number of snapshots to keep for hourly schedule
-	newHourlySchedule := snapshotPolicy.HourlySchedule.(netapp.HourlySchedule)
+	newHourlySchedule := *snapshotPolicy.SnapshotPolicyProperties.HourlySchedule
 	newHourlySchedule.SnapshotsToKeep = to.Int32Ptr(10)
 
 	// Creating a patch object
