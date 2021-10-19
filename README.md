@@ -30,13 +30,12 @@ If you don't already have a Microsoft Azure subscription, you can get a FREE tri
 
 1. Go installed \(if not installed yet, follow the [official instructions](https://golang.org/dl/)\)
 1. Azure Subscription
-1. Subscription needs to be enabled for Azure NetApp Files. For more information, please refer to [this](https://docs.microsoft.com/azure/azure-netapp-files/azure-netapp-files-register#waitlist) document.
-1. Register the snapshot policy Feature. For more information, see [Registration steps in Manage snapshots by using Azure NetApp Files](https://docs.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-manage-snapshots#register-the-feature). (This step is applicable only during the preview state of the snapshot policy feature.) 
+1. Subscription needs to have Azure NetApp Files resource provider registered. For more information, see [Register for NetApp Resource Provider](https://docs.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-register).
 1. Resource Group created
-1. Virtual Network with a delegated subnet to Microsoft.Netapp/volumes resource. For more information, see [Guidelines for Azure NetApp Files network planning](https://docs.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-network-topologies). 
+1. Virtual Network with a delegated subnet to Microsoft.Netapp/volumes resource. For more information, see [Guidelines for Azure NetApp Files network planning](https://docs.microsoft.com/en-us/azure/azure-netapp-files/azure-netapp-files-network-topologies).
 1. Adjust variable contents within the `var()` block at `example.go` file to match your environment.
 1. For this sample Go console application work, authentication is required. The chosen method for this sample is service principals:
-    * Within an [Azure Cloud Shell](https://docs.microsoft.com/en-us/azure/cloud-shell/quickstart) session, make sure you're logged in at the subscription where you want to be associated with the service principal by default: 
+    * Within an [Azure Cloud Shell](https://docs.microsoft.com/en-us/azure/cloud-shell/quickstart) session, make sure you're logged in at the subscription where you want to be associated with the service principal by default:
 
       ```bash
       az account show
